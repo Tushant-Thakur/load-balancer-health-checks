@@ -1,28 +1,28 @@
 const axios = require("axios");
-
-let servers = [
-  { url: "http://localhost:3001", alive: true },
-  { url: "http://localhost:3002", alive: true }
-];
+const Server = require("../database/db");
 
 async function checkHealth() {
+  const servers = await Server.find();
+
   for (let server of servers) {
     try {
       await axios.get(server.url + "/health");
-      server.alive = true;
-      console.log("✅ " + server.url + " is UP");
+
+      await Server.updateOne(
+        { _id: server._id },
+        { status: "UP", lastChecked: new Date() }
+      );
+
+      console.log("✅ " + server.url + " UP");
     } catch {
-      server.alive = false;
-      console.log("❌ " + server.url + " is DOWN");
+      await Server.updateOne(
+        { _id: server._id },
+        { status: "DOWN", lastChecked: new Date() }
+      );
+
+      console.log("❌ " + server.url + " DOWN");
     }
   }
 }
 
 setInterval(checkHealth, 5000);
-
-module.exports = {servers};
-
-
-
-
-
