@@ -1,0 +1,46 @@
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+}
+
+table {
+  margin: auto;
+  width: 70%;
+  border-collapse: collapse;
+  background: #1e293b;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #334155;
+}
+
+th {
+  background: #2563eb;
+}
+
+.UP { color: #22c55e; }
+.DOWN { color: #ef4444; }
+
+button {
+  padding: 10px 20px;
+  margin: 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+}
+.chart-container {
+  width: 60%;
+  max-width: 600px;
+  margin: 30px auto;
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 300px !important;
+}

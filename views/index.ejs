@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Load Balancer Dashboard</title>
+
+  <link rel="stylesheet" href="/style.css">
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<h1>🚀 Load Balancer Dashboard</h1>
+
+<button onclick="generateLoad()">Generate Load</button>
+
+
+<table>
+  <tr>
+    <th>Server</th>
+    <th>Status</th>
+    <th>Connections</th>
+  </tr>
+
+  <% servers.forEach(s => { %>
+    <tr>
+      <td><%= s.url %></td>
+      <td class="<%= s.status %>"><%= s.status %></td>
+      <td><%= s.connections %></td>
+    </tr>
+  <% }) %>
+
+</table>
+
+<!-- GRAPH -->
+<h2>📊 Live Connections</h2>
+<canvas id="chart" width="400" height="200"></canvas>
+
+<script>
+let chart;
+
+async function loadChart() {
+  const res = await fetch("/stats");
+  const data = await res.json();
+
+  const labels = data.map(s => s.url);
+  const values = data.map(s => s.connections);
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update();
+  } else {
+    chart = new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Connections",
+          data: values,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.2)",
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+}
+
+setInterval(loadChart, 3000);
+loadChart();
+</script>
+</body>
+</html>
