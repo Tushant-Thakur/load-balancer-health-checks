@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Load Balancer Dashboard</title>
+</head>
+<body>
+
+<h1>Server Status Dashboard</h1>
+
+<table border="1">
+  <tr>
+    <th>URL</th>
+    <th>Status</th>
+    <th>Connections</th>
+  </tr>
+
+  <% servers.forEach(server => { %>
+    <tr>
+      <td><%= server.url %></td>
+      <td><%= server.status %></td>
+      <td><%= server.connections %></td>
+    </tr>
+  <% }) %>
+
+</table>
+
+</body>
+</html>
