@@ -1,36 +1,37 @@
 const httpProxy = require("http-proxy");
 const proxy = httpProxy.createProxyServer();
+const Server = require("../database/db");
 
-const monitor = require("../health-monitor/monitor");
+async function getServer() {
+  const servers = await Server.find({ status: "UP" });
 
-let index = 0;
+  if (servers.length === 0) return null;
 
-function getServer() {
-  let available = monitor.servers.filter(s => s.alive);
-
-  if (available.length === 0) return null;
-
-  let leastServer = available.reduce((prev, curr) =>
-    (prev.connections || 0) <= (curr.connections || 0) ? prev : curr
+  let selected = servers.reduce((prev, curr) =>
+    prev.connections < curr.connections ? prev : curr
   );
 
-  index++;
+  await Server.updateOne(
+    { _id: selected._id },
+    { $inc: { connections: 1 } }
+  );
 
-  return leastServer;
+  return selected;
 }
 
-module.exports = (req, res) => {
-  const server = getServer();
+module.exports = async (req, res) => {
+  const server = await getServer();
 
   if (!server) {
     return res.status(503).send("❌ No backend available");
   }
 
-  server.connections = (server.connections || 0) + 1;
-
   proxy.web(req, res, { target: server.url });
 
-  res.on("finish", () => {
-    server.connections--;
+  res.on("finish", async () => {
+    await Server.updateOne(
+      { _id: server._id },
+      { $inc: { connections: -1 } }
+    );
   });
 };
