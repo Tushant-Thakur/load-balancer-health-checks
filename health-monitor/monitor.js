@@ -78,7 +78,7 @@ async function autoScale() {
 
     await Server.deleteOne({ _id: last._id });
 
-    console.log("🗑️ Removed server:", last.url);
+    console.log(" Removed server:", last.url);
 
     setTimeout(() => {
       scalingInProgress = false;
@@ -86,7 +86,6 @@ async function autoScale() {
   }
 }
 
-// ================= RUN LOOP =================
 setInterval(async () => {
   await checkHealth();
   await autoScale();
