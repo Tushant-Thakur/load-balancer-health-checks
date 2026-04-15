@@ -7,6 +7,9 @@ const serverSchema = new mongoose.Schema({
   status: String,
   connections: { type: Number, default: 0 },
   lastChecked: Date,
+  responseTime: { type: Number, default: 0 }
 });
+
+
 
 module.exports = mongoose.model("Server", serverSchema);

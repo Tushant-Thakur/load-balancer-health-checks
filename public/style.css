@@ -25,11 +25,40 @@ th {
 .DOWN { color: #ef4444; }
 
 button {
-  padding: 10px 20px;
+  padding: 12px 25px;
   margin: 20px;
-  background: #2563eb;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   border: none;
+  border-radius: 12px; /* 🔥 rounded */
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+
+  /* smooth animation */
+  transition: all 0.2s ease;
+
+  /* shadow for depth */
+  box-shadow: 0 6px 0 #1e40af;
+}
+
+/* 🟢 Hover effect */
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 #1e40af;
+}
+
+/* 🔴 CLICK (PUSH DOWN EFFECT) */
+button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #1e40af;
+}
+
+/* disabled state */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 .chart-container {
   width: 60%;

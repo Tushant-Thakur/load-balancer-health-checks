@@ -4,65 +4,142 @@
   <title>Load Balancer Dashboard</title>
 
   <link rel="stylesheet" href="/style.css">
-
-
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      background: #1e293b;
+    }
+
+    th, td {
+      border: 1px solid #334155;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #2563eb;
+    }
+
+    .UP {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .DOWN {
+      color: #ef4444;
+      font-weight: bold;
+    }
+
+    canvas {
+      margin-top: 20px;
+      height: 300px !important;
+    }
+
+    button {
+      padding: 12px 25px;
+      margin: 20px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 6px 0 #1e40af;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 0 #1e40af;
+    }
+
+    button:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #1e40af;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  </style>
 </head>
 
 <body>
 
 <h1>🚀 Load Balancer Dashboard</h1>
 
-<button onclick="generateLoad()">Generate Load</button>
-
+<button id="loadBtn">Generate Load</button>
 
 <table>
-  <tr>
-    <th>Server</th>
-    <th>Status</th>
-    <th>Connections</th>
-  </tr>
-
-  <% servers.forEach(s => { %>
+  <thead>
     <tr>
-      <td><%= s.url %></td>
-      <td class="<%= s.status %>"><%= s.status %></td>
-      <td><%= s.connections %></td>
+      <th>Server</th>
+      <th>Status</th>
+      <th>Connections</th>
+      <th>Response Time</th>
     </tr>
-  <% }) %>
-
+  </thead>
+  <tbody id="serverTable"></tbody>
 </table>
 
-<!-- GRAPH -->
 <h2>📊 Live Connections</h2>
-<canvas id="chart" width="400" height="200"></canvas>
+<canvas id="chart"></canvas>
+
+<script src="/socket.io/socket.io.js"></script>
 
 <script>
 let chart;
 
-async function loadChart() {
-  const res = await fetch("/stats");
-  const data = await res.json();
+// 🔁 TABLE UPDATE
+function updateTable(data) {
+  const table = document.getElementById("serverTable");
+  table.innerHTML = "";
 
+  data.forEach(s => {
+    const timeText =
+      s.responseTime === 0
+        ? "⏳ Waiting..."
+        : s.responseTime + " ms";
+
+    table.innerHTML += `
+      <tr>
+        <td>${s.url}</td>
+        <td class="${s.status}">${s.status}</td>
+        <td>${s.connections || 0}</td>
+        <td>${timeText}</td>
+      </tr>
+    `;
+  });
+}
+
+// 📊 GRAPH UPDATE
+function updateChart(data) {
   const labels = data.map(s => s.url);
-  const values = data.map(s => s.connections);
+  const values = data.map(s => s.connections || 0);
 
-  if (chart) {
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = values;
-    chart.update();
-  } else {
+  if (!chart) {
     chart = new Chart(document.getElementById("chart"), {
-      type: "line",
+      type: "bar",
       data: {
-        labels: labels,
+        labels,
         datasets: [{
           label: "Connections",
-          data: values,
-          borderColor: "#3b82f6",
-          backgroundColor: "rgba(59,130,246,0.2)",
-          tension: 0.4,
-          fill: true
+          data: values
         }]
       },
       options: {
@@ -70,11 +147,58 @@ async function loadChart() {
         maintainAspectRatio: false
       }
     });
+  } else {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update();
   }
 }
 
-setInterval(loadChart, 3000);
-loadChart();
+// ⚡ SOCKET
+const socket = io();
+
+socket.on("stats", (data) => {
+  updateTable(data);
+  updateChart(data);
+});
+
+// 🔁 FALLBACK
+setInterval(async () => {
+  try {
+    const res = await fetch("/stats");
+    const data = await res.json();
+    updateTable(data);
+    updateChart(data);
+  } catch (err) {
+    console.error(err);
+  }
+}, 2000);
+
+// ⚡ BUTTON
+document.getElementById("loadBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("loadBtn");
+
+  btn.innerText = "⏳ Generating...";
+  btn.disabled = true;
+
+  try {
+    await fetch("/generate-load");
+    btn.innerText = "✅ Done!";
+  } catch {
+    btn.innerText = "❌ Error!";
+  }
+
+  setTimeout(() => {
+    btn.innerText = "Generate Load";
+    btn.disabled = false;
+  }, 2000);
+});
+
+// 🔥 AUTO LOAD
+window.onload = () => {
+  fetch("/generate-load");
+};
 </script>
+
 </body>
 </html>

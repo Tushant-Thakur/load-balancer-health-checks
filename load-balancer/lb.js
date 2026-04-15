@@ -11,6 +11,7 @@ async function getServer() {
 
   let selected = servers[index % servers.length];
   index++;
+  
 
   let least = servers.reduce((prev, curr) =>
     prev.connections < curr.connections ? prev : curr
@@ -19,6 +20,7 @@ async function getServer() {
   if (least.connections < selected.connections) {
     selected = least;
   }
+  console.log("➡️ Routing request to:", selected.url);
 
   await Server.updateOne(
     { _id: selected._id },
@@ -29,6 +31,7 @@ async function getServer() {
 }
 
 module.exports = async (req, res) => {
+  const start = Date.now();
   const server = await getServer();
 
   if (!server) {
@@ -37,12 +40,19 @@ module.exports = async (req, res) => {
 
   proxy.web(req, res, { target: server.url });
 
-  res.on("finish", async () => {
+    res.on("finish", async () => {
+    const time = Date.now() - start;
+
+    await Server.updateOne(
+      { _id: server._id },
+      { responseTime: time }
+    );
+
     setTimeout(async () => {
       await Server.updateOne(
         { _id: server._id },
         { $inc: { connections: -1 } }
       );
-    }, 3000);
+    }, 1000);
   });
 };

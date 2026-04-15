@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 
 app.get("/", async (req, res) => {
-  await new Promise(r => setTimeout(r, 5000)); 
+  await new Promise(r => setTimeout(r, 2500)); 
   res.send("🔥 Response from Server 1");
 });
 
