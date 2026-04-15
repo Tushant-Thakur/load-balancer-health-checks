@@ -109,7 +109,7 @@
 <script>
 let chart;
 
-// 🔁 TABLE UPDATE
+
 function updateTable(data) {
   const table = document.getElementById("serverTable");
   table.innerHTML = "";
@@ -131,7 +131,7 @@ function updateTable(data) {
   });
 }
 
-// 📊 GRAPH UPDATE
+//  GRAPH UPDATE
 function updateChart(data) {
   const labels = data.map(s => s.url);
   const values = data.map(s => s.connections || 0);
