@@ -2,112 +2,90 @@
 <html>
 <head>
   <title>Load Balancer Dashboard</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <style>
-    body {
-      font-family: Arial;
-      padding: 20px;
-      background: #0f172a;
-      color: white;
-      text-align: center;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-      background: #1e293b;
-    }
-
-    th, td {
-      border: 1px solid #334155;
-      padding: 10px;
-      text-align: center;
-    }
-
-    th {
-      background: #2563eb;
-    }
-
-    .UP {
-      color: #22c55e;
-      font-weight: bold;
-    }
-
-    .DOWN {
-      color: #ef4444;
-      font-weight: bold;
-    }
-
-    canvas {
-      margin-top: 20px;
-      height: 300px !important;
-    }
-
-    button {
-      padding: 12px 25px;
-      margin: 20px;
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 6px 0 #1e40af;
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 0 #1e40af;
-    }
-
-    button:active {
-      transform: translateY(4px);
-      box-shadow: 0 2px 0 #1e40af;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-  </style>
 </head>
 
 <body>
+<main class="dashboard-shell">
+  <header class="hero">
+    <p class="eyebrow">Real-time Infrastructure Monitor</p>
+    <h1>Load Balancer Dashboard</h1>
+    <p class="subtext">Track backend health, traffic, and response times with live updates.</p>
+    <div class="hero-actions">
+      <button id="loadBtn">Generate Load</button>
+    </div>
+  </header>
 
-<h1> Load Balancer Dashboard</h1>
+  <section class="table-card">
+    <h2>Server Status</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Server</th>
+            <th>Status</th>
+            <th>Connections</th>
+            <th>Response Time</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="serverTable"></tbody>
+      </table>
+    </div>
+  </section>
 
-<button id="loadBtn">Generate Load</button>
+  <section class="chart-card">
+    <h2>Recent Health History Trend</h2>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </section>
 
-<table>
-  <thead>
-    <tr>
-      <th>Server</th>
-      <th>Status</th>
-      <th>Connections</th>
-      <th>Response Time</th>
-    </tr>
-  </thead>
-  <tbody id="serverTable"></tbody>
-</table>
+  <section class="detail-grid">
+    <article class="table-card">
+      <h2>Recent Health History</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Server</th>
+              <th>Status</th>
+              <th>Latency</th>
+              <th>Checked</th>
+            </tr>
+          </thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+      </div>
+    </article>
 
-<h2>📊 Live Connections</h2>
-<canvas id="chart"></canvas>
+    <article class="table-card">
+      <h2>Backend Config Changes</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Server</th>
+              <th>Git Commit</th>
+              <th>At</th>
+            </tr>
+          </thead>
+          <tbody id="configTable"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+</main>
 
 <script src="/socket.io/socket.io.js"></script>
 
-<!-- GRAPH -->
-<h2> Live Connections</h2>
-<canvas id="chart" width="400" height="200"></canvas>
-
 <script>
 let chart;
+const MAX_TIMELINE_POINTS = 40;
 
 
 function updateTable(data) {
@@ -120,65 +98,202 @@ function updateTable(data) {
         ? "⏳ Waiting..."
         : s.responseTime + " ms";
 
+    const actionBtn = s.isDisconnected
+      ? `<button class="mini-btn reconnect-btn" data-action="reconnect" data-url="${s.url}">Reconnect</button>`
+      : `<button class="mini-btn disconnect-btn" data-action="disconnect" data-url="${s.url}">Disconnect</button>`;
+
     table.innerHTML += `
       <tr>
         <td>${s.url}</td>
-        <td class="${s.status}">${s.status}</td>
+        <td><span class="status-pill ${s.status}">${s.status}</span></td>
         <td>${s.connections || 0}</td>
         <td>${timeText}</td>
+        <td>${actionBtn}</td>
+      </tr>
+    `;
+  });
+
+  bindServerActionButtons();
+}
+
+function updateHistoryTable(data) {
+  const table = document.getElementById("historyTable");
+  table.innerHTML = "";
+
+  data.slice(0, 10).forEach(item => {
+    const checkedAt = new Date(item.checkedAt).toLocaleTimeString();
+    const latency = item.status === "UP" ? `${item.latencyMs} ms` : "-";
+
+    table.innerHTML += `
+      <tr>
+        <td>${item.serverUrl}</td>
+        <td><span class="status-pill ${item.status}">${item.status}</span></td>
+        <td>${latency}</td>
+        <td>${checkedAt}</td>
       </tr>
     `;
   });
 }
 
-//  GRAPH UPDATE
-function updateChart(data) {
-  const labels = data.map(s => s.url);
-  const values = data.map(s => s.connections || 0);
+function updateConfigTable(data) {
+  const table = document.getElementById("configTable");
+  table.innerHTML = "";
+
+  data.slice(0, 10).forEach(item => {
+    const changedAt = new Date(item.createdAt).toLocaleTimeString();
+
+    table.innerHTML += `
+      <tr>
+        <td>${item.action}</td>
+        <td>${item.url}</td>
+        <td>${item.gitCommit || "unknown"}</td>
+        <td>${changedAt}</td>
+      </tr>
+    `;
+  });
+}
+
+function bindServerActionButtons() {
+  const buttons = document.querySelectorAll(".mini-btn");
+  buttons.forEach((btn) => {
+    btn.onclick = async () => {
+      const action = btn.dataset.action;
+      const url = btn.dataset.url;
+      const endpoint = action === "disconnect" ? "/disconnect-server" : "/reconnect-server";
+
+      btn.disabled = true;
+      const originalLabel = btn.innerText;
+      btn.innerText = "Updating...";
+
+      try {
+        await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+      }
+    };
+  });
+}
+
+// GRAPH UPDATE
+function updateChart(historyData) {
+  const timeline = historyData
+    .slice(0, MAX_TIMELINE_POINTS)
+    .reverse();
+
+  const labels = timeline.map(item => {
+    const time = new Date(item.checkedAt).toLocaleTimeString();
+    const server = item.serverUrl.split(":").pop();
+    return `${time} (${server})`;
+  });
+
+  const latencyValues = timeline.map(item => (
+    item.status === "UP" ? item.latencyMs : 0
+  ));
+
+  const pointColors = timeline.map(item => (
+    item.status === "UP" ? "#22d3ee" : "#f43f5e"
+  ));
 
   if (!chart) {
     chart = new Chart(document.getElementById("chart"), {
-      type: "bar",
+      type: "line",
       data: {
         labels,
         datasets: [{
-          label: "Connections",
-          data: values
+          label: "Health Check Latency (ms)",
+          data: latencyValues,
+          borderColor: "#22d3ee",
+          backgroundColor: "rgba(34, 211, 238, 0.18)",
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointColors,
+          pointRadius: 2.5,
+          fill: true,
+          tension: 0.35
         }]
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false
+        maintainAspectRatio: false,
+        animation: {
+          duration: 350
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#e2e8f0"
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "#cbd5e1",
+              maxTicksLimit: 6
+            },
+            grid: {
+              color: "rgba(148, 163, 184, 0.2)"
+            }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: "#cbd5e1"
+            },
+            grid: {
+              color: "rgba(148, 163, 184, 0.2)"
+            }
+          }
+        }
       }
     });
   } else {
     chart.data.labels = labels;
-    chart.data.datasets[0].data = values;
+    chart.data.datasets[0].data = latencyValues;
+    chart.data.datasets[0].pointBackgroundColor = pointColors;
+    chart.data.datasets[0].pointBorderColor = pointColors;
     chart.update();
   }
 }
 
-// ⚡ SOCKET
+//  SOCKET
 const socket = io();
 
 socket.on("stats", (data) => {
   updateTable(data);
-  updateChart(data);
 });
 
-// 🔁 FALLBACK
+//  FALLBACK
 setInterval(async () => {
   try {
-    const res = await fetch("/stats");
-    const data = await res.json();
-    updateTable(data);
-    updateChart(data);
+    const [statsRes, historyRes, configRes] = await Promise.all([
+      fetch("/stats"),
+      fetch("/history"),
+      fetch("/config-history")
+    ]);
+
+    const [statsData, historyData, configData] = await Promise.all([
+      statsRes.json(),
+      historyRes.json(),
+      configRes.json()
+    ]);
+
+    updateTable(statsData);
+    updateChart(historyData);
+    updateHistoryTable(historyData);
+    updateConfigTable(configData);
   } catch (err) {
     console.error(err);
   }
 }, 2000);
 
-// ⚡ BUTTON
+//  BUTTON
 document.getElementById("loadBtn").addEventListener("click", async () => {
   const btn = document.getElementById("loadBtn");
 
@@ -198,10 +313,15 @@ document.getElementById("loadBtn").addEventListener("click", async () => {
   }, 2000);
 });
 
-// 🔥 AUTO LOAD
+//  AUTO LOAD
 window.onload = () => {
   fetch("/generate-load");
 };
+
+// Keep light background traffic so live graph visibly changes.
+setInterval(() => {
+  fetch("/generate-load").catch(() => {});
+}, 10000);
 </script>
 
 </body>
