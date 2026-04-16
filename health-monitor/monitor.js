@@ -1,34 +1,91 @@
 const axios = require("axios");
-const Server = require("../database/db");
+const http = require("http");
+const { Server, HealthHistory, BackendConfig } = require("../database/db");
 
 const MAX_CONN = 10;   // scale up threshold
 const MIN_CONN = 2;    // scale down threshold
+const HEALTH_CHECK_INTERVAL = 5000;
+const KEEP_HISTORY_LIMIT = 500;
 
 let scalingInProgress = false;
+const healthHttp = axios.create({
+  timeout: 3000,
+  httpAgent: new http.Agent({ keepAlive: true, maxSockets: 64 })
+});
+
+async function trimHealthHistory() {
+  const count = await HealthHistory.countDocuments();
+  if (count <= KEEP_HISTORY_LIMIT) return;
+
+  const removeCount = count - KEEP_HISTORY_LIMIT;
+  const toRemove = await HealthHistory.find()
+    .sort({ checkedAt: 1 })
+    .limit(removeCount)
+    .select("_id");
+
+  if (toRemove.length) {
+    await HealthHistory.deleteMany({ _id: { $in: toRemove.map((item) => item._id) } });
+  }
+}
 
 // ================= HEALTH CHECK =================
 async function checkHealth() {
   const servers = await Server.find();
 
   for (let server of servers) {
+    if (server.isDisconnected) {
+      await Server.updateOne(
+        { _id: server._id },
+        { status: "DOWN", lastChecked: new Date(), responseTime: 0, connections: 0 }
+      );
+
+      await HealthHistory.create({
+        serverUrl: server.url,
+        status: "DOWN",
+        latencyMs: 0,
+        checkedAt: new Date(),
+        note: "manually disconnected"
+      });
+      continue;
+    }
+
+    const startedAt = Date.now();
     try {
-      await axios.get(server.url + "/health");
+      await healthHttp.get(server.url + "/health");
+      const latency = Date.now() - startedAt;
 
       await Server.updateOne(
         { _id: server._id },
-        { status: "UP", lastChecked: new Date() }
+        { status: "UP", lastChecked: new Date(), responseTime: latency }
       );
 
+      await HealthHistory.create({
+        serverUrl: server.url,
+        status: "UP",
+        latencyMs: latency,
+        checkedAt: new Date()
+      });
+
       console.log("✅ " + server.url + " UP");
-    } catch {
+    } catch (err) {
       await Server.updateOne(
         { _id: server._id },
         { status: "DOWN", lastChecked: new Date() }
       );
 
+      await HealthHistory.create({
+        serverUrl: server.url,
+        status: "DOWN",
+        latencyMs: 0,
+        checkedAt: new Date(),
+        note: err.message
+      });
+
       console.log("❌ " + server.url + " DOWN");
     }
   }
+
+  await trimHealthHistory();
 }
 
 // ================= AUTO SCALING =================
@@ -60,6 +117,12 @@ async function autoScale() {
       status: "UP",
       connections: 0
     });
+    await BackendConfig.create({
+      action: "AUTO_SCALE_UP",
+      url: `http://localhost:${newPort}`,
+      changedBy: "health-monitor",
+      metadata: { reason: "connections above threshold" }
+    });
 
     console.log("✅ New server added:", newPort);
 
@@ -77,6 +140,12 @@ async function autoScale() {
     const last = servers[servers.length - 1];
 
     await Server.deleteOne({ _id: last._id });
+    await BackendConfig.create({
+      action: "AUTO_SCALE_DOWN",
+      url: last.url,
+      changedBy: "health-monitor",
+      metadata: { reason: "connections below threshold" }
+    });
 
     console.log(" Removed server:", last.url);
 
@@ -89,4 +158,4 @@ async function autoScale() {
 setInterval(async () => {
   await checkHealth();
   await autoScale();
-}, 5000);
+}, HEALTH_CHECK_INTERVAL);

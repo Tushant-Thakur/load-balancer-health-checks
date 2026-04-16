@@ -7,9 +7,11 @@
     "server2": "node backends/server2.js",
     "server3": "node backends/server3.js",
     "server4": "node backends/server4.js",
+    "backend:dynamic": "node backends/dynamic-server.js",
     "monitor": "node health-monitor/monitor.js",
     "lb": "node load-balancer/server.js",
-    "start-all": "run-p server1 server2 server3 server4 monitor lb"
+    "start-all": "run-p server1 server2 server3 server4 monitor lb",
+    "seed:history": "node scripts/seed-health-history.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +23,6 @@
     "express": "^5.2.1",
     "http-proxy": "^1.18.1",
     "mongoose": "^9.4.1",
-    "npm-run-all": "^4.1.5",
     "socket.io": "^4.8.3"
   },
   "repository": {
@@ -32,5 +33,8 @@
     "url": "https://github.com/Tushant-Thakur/load-balancer-health-checks/issues"
   },
   "homepage": "https://github.com/Tushant-Thakur/load-balancer-health-checks#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
 }
