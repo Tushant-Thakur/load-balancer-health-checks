@@ -2,8 +2,8 @@ const axios = require("axios");
 const http = require("http");
 const { Server, HealthHistory, BackendConfig } = require("../database/db");
 
-const MAX_CONN = 10;   // scale up threshold
-const MIN_CONN = 2;    // scale down threshold
+const MAX_CONN = 10;   
+const MIN_CONN = 2;    
 const HEALTH_CHECK_INTERVAL = 5000;
 const KEEP_HISTORY_LIMIT = 500;
 
@@ -28,7 +28,6 @@ async function trimHealthHistory() {
   }
 }
 
-// ================= HEALTH CHECK =================
 async function checkHealth() {
   const servers = await Server.find();
 
@@ -88,13 +87,13 @@ async function checkHealth() {
   await trimHealthHistory();
 }
 
-// ================= AUTO SCALING =================
+
 async function autoScale() {
   const servers = await Server.find({ status: "UP" });
 
   if (servers.length === 0) return;
 
-  // 🔥 Only allow known servers (avoid fake ports)
+  
   const availablePorts = [3001, 3002, 3003, 3004];
 
   const usedPorts = servers.map(s => {
@@ -104,7 +103,7 @@ async function autoScale() {
 
   const newPort = availablePorts.find(p => !usedPorts.includes(p));
 
-  // ================= SCALE UP =================
+  
   let overloaded = servers.some(s => s.connections > MAX_CONN);
 
   if (overloaded && !scalingInProgress && newPort) {
@@ -131,7 +130,7 @@ async function autoScale() {
     }, 10000);
   }
 
-  // ================= SCALE DOWN =================
+  
   let lowLoad = servers.every(s => s.connections < MIN_CONN);
 
   if (lowLoad && servers.length > 2 && !scalingInProgress) {
