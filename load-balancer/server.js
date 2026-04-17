@@ -265,7 +265,7 @@ io.on("connection", (socket) => {
 // ================= LOAD BALANCER =================
 // Keep the gateway under one explicit route so "/" stays the UI entry point.
 app.use("/gateway", lb);
-
+//starting the server  by udit raghav
 // ================= START SERVER =================
 async function start() {
   try {
