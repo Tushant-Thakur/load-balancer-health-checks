@@ -16,8 +16,7 @@ async function getServer() {
   let least = servers.reduce((prev, curr) =>
     prev.connections < curr.connections ? prev : curr
   );
-
-  // Round-robin is default; least-connection fallback handles burst imbalance.
+  
   if (selected.connections - least.connections >= BURST_FALLBACK_GAP) {
     selected = least;
   }
