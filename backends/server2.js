@@ -3,7 +3,7 @@ const app = express();
 
 app.get("/", async (req, res) => {
   await new Promise(r => setTimeout(r, 300));
-  res.send("⚡ Response from Server 2");
+  res.send(" Response from Server 2");
 });
 
 app.get("/health", (req, res) => {

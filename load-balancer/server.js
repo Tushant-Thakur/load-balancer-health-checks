@@ -59,7 +59,7 @@ async function ensureDefaultBackends() {
     }))
   );
 
-  console.log("✅ Seeded default backend servers");
+  console.log(" Seeded default backend servers");
 }
 
 async function ensureConfigBaseline() {
@@ -80,17 +80,15 @@ async function ensureConfigBaseline() {
   );
 }
 
-// ================= MIDDLEWARE =================
+
 app.use(express.json());
 app.use(express.static("public"));
 
-// ================= EJS SETUP =================
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "../views"));
 
-// ================= ROUTES =================
 
-// Dashboard (single entry point)
 app.get("/", async (req, res) => {
   try {
     const servers = await Server.find();
@@ -100,12 +98,11 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Backward-compatible dashboard URL
 app.get("/dashboard", (req, res) => {
   res.redirect("/");
 });
 
-// API: Stats
+
 app.get("/stats", async (req, res) => {
   try {
     const servers = await Server.find();
@@ -137,7 +134,7 @@ app.get("/config-history", async (req, res) => {
   }
 });
 
-// ================= REAL-TIME SOCKET EMIT =================
+
 setInterval(async () => {
   try {
     const servers = await Server.find();
@@ -147,9 +144,7 @@ setInterval(async () => {
   }
 }, 2000);
 
-// ================= SERVER MANAGEMENT =================
 
-// Add server
 app.post("/add-server", async (req, res) => {
   try {
     const { url } = req.body;
@@ -177,7 +172,7 @@ app.post("/add-server", async (req, res) => {
   }
 });
 
-// Remove server
+
 app.post("/remove-server", async (req, res) => {
   try {
     const { url } = req.body;
@@ -240,7 +235,7 @@ app.post("/reconnect-server", async (req, res) => {
   }
 });
 
-// ================= LOAD GENERATION =================
+
 app.get("/generate-load", async (req, res) => {
   try {
     let requests = [];
@@ -257,16 +252,14 @@ app.get("/generate-load", async (req, res) => {
   }
 });
 
-// ================= SOCKET CONNECTION =================
+
 io.on("connection", (socket) => {
   console.log("⚡ Client connected");
 });
 
-// ================= LOAD BALANCER =================
-// Keep the gateway under one explicit route so "/" stays the UI entry point.
+
 app.use("/gateway", lb);
-//starting the server  by udit raghav
-// ================= START SERVER =================
+
 async function start() {
   try {
     await ensureDefaultBackends();

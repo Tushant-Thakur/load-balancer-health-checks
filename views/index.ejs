@@ -95,7 +95,7 @@ function updateTable(data) {
   data.forEach(s => {
     const timeText =
       s.responseTime === 0
-        ? "⏳ Waiting..."
+        ? " Waiting..."
         : s.responseTime + " ms";
 
     const actionBtn = s.isDisconnected
@@ -181,7 +181,7 @@ function bindServerActionButtons() {
   });
 }
 
-// GRAPH UPDATE
+
 function updateChart(historyData) {
   const timeline = historyData
     .slice(0, MAX_TIMELINE_POINTS)
@@ -262,14 +262,14 @@ function updateChart(historyData) {
   }
 }
 
-//  SOCKET
+
 const socket = io();
 
 socket.on("stats", (data) => {
   updateTable(data);
 });
 
-//  FALLBACK
+
 setInterval(async () => {
   try {
     const [statsRes, historyRes, configRes] = await Promise.all([
@@ -293,18 +293,18 @@ setInterval(async () => {
   }
 }, 2000);
 
-//  BUTTON
+
 document.getElementById("loadBtn").addEventListener("click", async () => {
   const btn = document.getElementById("loadBtn");
 
-  btn.innerText = "⏳ Generating...";
+  btn.innerText = " Generating...";
   btn.disabled = true;
 
   try {
     await fetch("/generate-load");
-    btn.innerText = "✅ Done!";
+    btn.innerText = " Done!";
   } catch {
-    btn.innerText = "❌ Error!";
+    btn.innerText = " Error!";
   }
 
   setTimeout(() => {
@@ -313,12 +313,12 @@ document.getElementById("loadBtn").addEventListener("click", async () => {
   }, 2000);
 });
 
-//  AUTO LOAD
+
 window.onload = () => {
   fetch("/generate-load");
 };
 
-// Keep light background traffic so live graph visibly changes.
+
 setInterval(() => {
   fetch("/generate-load").catch(() => {});
 }, 10000);

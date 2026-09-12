@@ -1,65 +1,112 @@
 const httpProxy = require("http-proxy");
-const proxy = httpProxy.createProxyServer();
+const proxy = httpProxy.createProxyServer({});
 const { Server } = require("../database/db");
 
-let index = 0;
-const BURST_FALLBACK_GAP = 2;
+let currentIndex = 0;
 
-async function getServer() {
-  const servers = await Server.find({ status: "UP" }).sort({ url: 1 });
+async function getNextServer() {
+  const servers = await Server.find({
+    status: "UP",
+    isDisconnected: { $ne: true }
+  }).sort({ url: 1 });
 
-  if (servers.length === 0) return null;
-
-  let selected = servers[index % servers.length];
-  index++;
-
-  let least = servers.reduce((prev, curr) =>
-    prev.connections < curr.connections ? prev : curr
-  );
-  
-  if (selected.connections - least.connections >= BURST_FALLBACK_GAP) {
-    selected = least;
+  if (!servers.length) {
+    return null;
   }
 
-  console.log("➡️ Routing request to:", selected.url);
+  const server = servers[currentIndex % servers.length];
+  currentIndex++;
+
+  console.log(`➡️ Routing request to: ${server.url}`);
 
   await Server.updateOne(
-    { _id: selected._id },
-    { $inc: { connections: 1 } }
+    { _id: server._id },
+    {
+      $inc: { connections: 1 }
+    }
   );
 
-  return selected;
+  return server;
 }
 
 module.exports = async (req, res) => {
-  const start = Date.now();
-  const server = await getServer();
+  const backend = await getNextServer();
 
-  if (!server) {
-    return res.status(503).send("❌ No backend available");
+  if (!backend) {
+    return res.status(503).send("No backend available");
   }
 
-  proxy.web(req, res, { target: server.url }, async () => {
-    await Server.updateOne(
-      { _id: server._id },
-      { status: "DOWN", responseTime: 0, $inc: { connections: -1 } }
-    );
-  });
+  let cleaned = false;
 
-  res.on("finish", async () => {
-    const time = Date.now() - start;
+  const cleanup = async () => {
+    if (cleaned) return;
 
-    await Server.updateOne(
-      { _id: server._id },
-      { responseTime: time }
-    );
+    cleaned = true;
 
-    setTimeout(async () => {
-      await Server.updateOne(
-        { _id: server._id },
-        { $inc: { connections: -1 } }
+    try {
+      const latestServer = await Server.findById(
+        backend._id
       );
-    }, 1000);
-  });
 
+      if (!latestServer) return;
+
+      const newConnections = Math.max(
+        0,
+        latestServer.connections - 1
+      );
+
+      await Server.updateOne(
+        { _id: backend._id },
+        {
+          connections: newConnections
+        }
+      );
+    } catch (err) {
+      console.error(
+        "Cleanup Error:",
+        err.message
+      );
+    }
+  };
+
+  proxy.web(
+    req,
+    res,
+    {
+      target: backend.url
+    },
+    async (err) => {
+      console.error(
+        `❌ Backend Error: ${backend.url}`
+      );
+
+      try {
+        await Server.updateOne(
+          { _id: backend._id },
+          {
+            status: "DOWN",
+            connections: 0,
+            responseTime: 0
+          }
+        );
+      } catch (dbErr) {
+        console.error(
+          "DB Error:",
+          dbErr.message
+        );
+      }
+
+      if (!res.headersSent) {
+        res.status(502).send(
+          "Backend unavailable"
+        );
+      }
+    }
+  );
+
+  res.on("finish", cleanup);
+
+  res.on("error", async () => {
+    await cleanup();
+  });
 };
